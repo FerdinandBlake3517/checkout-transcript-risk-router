@@ -1,0 +1,21 @@
+{
+  "name": "checkout-transcript-risk-router",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/checkout_transcript_service.ts",
+    "replay": "tsx scripts/replay_checkout.ts",
+    "test": "tsx --test test/payment_decision.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openai": "^5.12.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
