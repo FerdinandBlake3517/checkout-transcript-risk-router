@@ -1,6 +1,6 @@
 # Route checkout transcripts into safe payment actions
 
-Boot the service. Send a checkout-call transcript. Get back a typed payment event and the storefront action. Infrai supplies an OpenAI-compatible `baseURL`, so the official client and one `INFRAI_API_KEY` handle the extraction call.
+Start the service, send a checkout-call transcript, and get back a typed payment event plus the action your storefront should take. Infrai supplies an OpenAI-compatible `baseURL`, so the official client and one `INFRAI_API_KEY` handle the extraction call.
 
 ```bash
 npm install
@@ -8,15 +8,15 @@ export INFRAI_API_KEY="your-key"
 npm run dev
 ```
 
-Open a second terminal. Run the included storefront replay:
+In another terminal, run the included storefront replay:
 
 ```bash
 npm run replay
 ```
 
-The script posts `paymentReference=pay_store_1042` and a transcript: USD 49.90 card payment captured with matching checks. Expected: `event.kind` set to `payment_captured`, `action.outcome` set to `record`, and `releaseFulfillment` set to `true`.
+The script posts `paymentReference=pay_store_1042` and a transcript saying a USD 49.90 card payment was captured with matching checks. The expected result is `event.kind` set to `payment_captured`, `action.outcome` set to `record`, and `releaseFulfillment` set to `true`.
 
-We keep the HTTP boundary tiny:
+The HTTP boundary is intentionally small:
 
 ```bash
 curl -X POST http://localhost:3000/checkout-transcripts \
@@ -24,13 +24,13 @@ curl -X POST http://localhost:3000/checkout-transcripts \
   -d '{"paymentReference":"pay_store_1042","transcript":"The USD 49.90 card payment was captured and checks matched."}'
 ```
 
-Audio capture and speech-to-text run upstream. This boundary keeps the repo focused. It handles the fintech step after transcription: spoken checkout facts become a validated event, an audit message, and a fulfillment decision. Flow: speech -> text -> (this service) -> event + action.
+Audio capture and speech-to-text run before this service. That boundary keeps this repository focused on the fintech step after transcription: turning spoken checkout facts into a validated event, an audit message, and a fulfillment decision.
 
 ## The decision in code
 
-The route validates incoming JSON and the model event with Zod. A clean `payment_captured` event records payment and releases fulfillment. Failed payment, refund, or risk signal holds fulfillment for manual review. Unknown speech stays held, logged, no invented payment state.
+The route validates both incoming JSON and the model-produced event with Zod. A clean `payment_captured` event records the payment and releases fulfillment. A failed payment, refund request, or any risk signal holds fulfillment for manual review. Unknown speech remains held and is logged without inventing a payment state.
 
-The focused test uses a captured payment with an address dispute in its transcript-derived event. It must produce `manual_review`, keep `releaseFulfillment` false, and include the payment reference in the audit notification.
+The focused test uses a captured payment whose transcript-derived event contains an address dispute. It must produce `manual_review`, keep `releaseFulfillment` false, and include the payment reference in the audit notification.
 
 ```bash
 npm test
@@ -41,13 +41,13 @@ npm run typecheck
 
 **Decision.** Use the official OpenAI TypeScript client against Infrai, ask `chat.completions` for a narrow JSON event, validate it, then keep fulfillment rules in ordinary TypeScript. The model reads language; deterministic code owns the risky action.
 
-**Option considered: let the model choose the final action.** Fewer lines, but a checkout team can't unit-test the release rule without a model call. It also mixes extraction with authorization, making an audit trail harder to explain.
+**Option considered: let the model choose the final action.** This uses fewer lines, but a checkout team cannot unit-test the release rule without making a model call. It also mixes extraction with authorization, which makes an audit trail harder to explain.
 
-**Option considered: keyword matching.** Deterministic, yet store calls phrase captures, disputes, and refunds many ways. Negation like “the payment was not captured” is the sharp edge.
+**Option considered: keyword matching.** This is deterministic, but store calls phrase captures, disputes, and refunds in too many ways. Negation such as “the payment was not captured” is the sharp edge.
 
-**Why this split.** The extracted event shows in the response, Zod rejects malformed output, and the action function is deterministic. Same event can sit beside the original transcript and merchant audit notification.
+**Why this split.** The extracted event is visible in the response, Zod rejects malformed output, and the action function is deterministic. The same event can be stored beside the original transcript and merchant audit notification.
 
-Prompt injection inside a transcript is the real gotcha. The system message treats transcript text as quoted, untrusted data. The Zod schema limits what crosses into the decision function. In a larger checkout system, persist raw transcript, validated event, decision, and model request identifier under the same payment reference.
+The one real gotcha is prompt injection inside a transcript. The system message treats transcript text as quoted, untrusted data, and the Zod schema limits what can cross into the decision function. In a larger checkout system, persist the raw transcript, validated event, decision, and model request identifier under the same payment reference.
 
 ## Request and response shape
 
@@ -90,7 +90,7 @@ MIT
 
 ## Going to production: Checkout Transcript Risk Router
 
-The example above is intentionally minimal. A few things to wire up for real use. Details below apply to Checkout Transcript Risk Router.
+The example above is intentionally minimal. A few things to wire up for real use: The details below apply to Checkout Transcript Risk Router.
 
 **Account & key**
 
